@@ -12,7 +12,7 @@ Future main() async {
     await InAppWebViewController.setWebContentsDebuggingEnabled(kDebugMode);
   }
 
-  runApp(ProviderScope(child: MaterialApp(home: App())));
+  runApp(const ProviderScope(child: MaterialApp(home: App())));
 }
 
 final webViewProvider =
@@ -20,7 +20,12 @@ final webViewProvider =
         (ref) => WebViewStateNotifier());
 
 class WebViewStateNotifier extends StateNotifier<WebViewState> {
-  WebViewStateNotifier() : super(WebViewState());
+  InAppWebViewController? webViewController;
+  WebViewStateNotifier() : super(const WebViewState());
+
+  void setWebViewController(InAppWebViewController controller) {
+    webViewController = controller;
+  }
 
   void updateUrl(String url) {
     state = state.copyWith(url: url);
@@ -36,7 +41,8 @@ class WebViewState {
   final String url;
   final double progress;
 
-  WebViewState({this.url = '', this.progress = 0.0});
+  const WebViewState(
+      {this.url = 'https://www.google.com', this.progress = 0.0});
 
   WebViewState copyWith({
     String? url,
@@ -50,87 +56,88 @@ class WebViewState {
 }
 
 class App extends ConsumerWidget {
+  const App({super.key});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final webViewState = ref.watch(webViewProvider);
-
+    
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: <Widget>[
-            TextField(
-              decoration: const InputDecoration(prefixIcon: Icon(Icons.search)),
-              controller: TextEditingController(text: webViewState.url),
-              keyboardType: TextInputType.url,
-              onSubmitted: (value) {
-                var url = Uri.parse(value);
-                if (url.scheme.isEmpty) {
-                  url = Uri.parse("https://www.google.com/search?q=$value");
-                }
-                ref.read(webViewProvider.notifier).updateUrl(url.toString());
-              },
-            ),
-            Expanded(
-              child: Stack(
-                children: [
-                  InAppWebView(
-                    initialUrlRequest:
-                        URLRequest(url: WebUri(webViewState.url)),
-                    onWebViewCreated: (controller) async {
-                      var url = await controller.getUrl();
-                      ref
-                          .read(webViewProvider.notifier)
-                          .updateUrl(url.toString());
-                    },
-                    onLoadStart: (controller, url) async {
-                      var url = await controller.getUrl();
-                      ref
-                          .read(webViewProvider.notifier)
-                          .updateUrl(url.toString());
-                    },
-                    onProgressChanged: (controller, progress) {
-                      ref
-                          .read(webViewProvider.notifier)
-                          .updateProgress(progress / 100);
-                    },
-                    onUpdateVisitedHistory: (controller, url, androidIsReload) {
-                      ref
-                          .read(webViewProvider.notifier)
-                          .updateUrl(url.toString());
-                    },
-                  ),
-                  webViewState.progress < 1.0
-                      ? LinearProgressIndicator(value: webViewState.progress)
-                      : Container(),
-                ],
-              ),
-            ),
-            ButtonBar(
-              alignment: MainAxisAlignment.center,
-              children: <Widget>[
-                ElevatedButton(
-                  child: const Icon(Icons.arrow_back),
-                  onPressed: () {
-                    // TODO: Implement back functionality
-                  },
-                ),
-                ElevatedButton(
-                  child: const Icon(Icons.arrow_forward),
-                  onPressed: () {
-                    // TODO: Implement forward functionality
-                  },
-                ),
-                ElevatedButton(
-                  child: const Icon(Icons.refresh),
-                  onPressed: () {
-                    // TODO: Implement refresh functionality
-                  },
-                ),
-              ],
-            ),
+            UrlInputField(webViewState: webViewState, ref: ref),
+            WebViewContainer(webViewState: webViewState, ref: ref),
           ],
         ),
       ),
     );
   }
 }
+
+class UrlInputField extends StatelessWidget {
+  final WebViewState webViewState;
+  final WidgetRef ref;
+
+  UrlInputField({required this.webViewState, required this.ref});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      decoration: const InputDecoration(prefixIcon: Icon(Icons.search)),
+      controller: TextEditingController(text: webViewState.url),
+      keyboardType: TextInputType.url,
+      onSubmitted: (value) {
+        var url = Uri.parse(value);
+        if (url.scheme.isEmpty) {
+          url = Uri.parse("https://www.google.com/search?q=$value");
+        }
+        ref.read(webViewProvider.notifier).updateUrl(url.toString());
+        ref.read(webViewProvider.notifier).webViewController?.loadUrl(
+              urlRequest: URLRequest(url: WebUri(url.toString())),
+            );
+      },
+    );
+  }
+}
+
+class WebViewContainer extends StatelessWidget {
+  final WebViewState webViewState;
+  final WidgetRef ref;
+
+  WebViewContainer({required this.webViewState, required this.ref});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Stack(
+        children: [
+          InAppWebView(
+            initialUrlRequest: URLRequest(url: WebUri(webViewState.url)),
+            onWebViewCreated: (controller) async {
+              ref
+                  .read(webViewProvider.notifier)
+                  .setWebViewController(controller);
+              var url = await controller.getUrl();
+              ref.read(webViewProvider.notifier).updateUrl(url.toString());
+            },
+            onLoadStart: (controller, url) async {
+              var url = await controller.getUrl();
+              ref.read(webViewProvider.notifier).updateUrl(url.toString());
+            },
+            onProgressChanged: (controller, progress) {
+              ref.read(webViewProvider.notifier).updateProgress(progress / 100);
+            },
+            onUpdateVisitedHistory: (controller, url, androidIsReload) {
+              ref.read(webViewProvider.notifier).updateUrl(url.toString());
+            },
+          ),
+          webViewState.progress < 1.0
+              ? LinearProgressIndicator(value: webViewState.progress)
+              : Container(),
+        ],
+      ),
+    );
+  }
+}
+
