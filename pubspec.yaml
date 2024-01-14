@@ -39,6 +39,7 @@ dependencies:
   url_launcher: ^6.2.3
   flutter_riverpod: ^2.4.9
   logger: ^2.0.2+1
+  pedantic_mono: ^1.24.0+1
 
 dev_dependencies:
   flutter_test:

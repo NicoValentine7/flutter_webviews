@@ -60,7 +60,7 @@ class App extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final webViewState = ref.watch(webViewProvider);
-    
+
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -160,7 +160,7 @@ class WebViewContainer extends StatelessWidget {
     ref.read(webViewProvider.notifier).updateUrl(url.toString());
   }
 
-  void _handleLoadStart(InAppWebViewController controller, Uri url) async {
+  void _handleLoadStart(InAppWebViewController controller, WebUri? url) async {
     var url = await controller.getUrl();
     ref.read(webViewProvider.notifier).updateUrl(url.toString());
   }
@@ -170,7 +170,7 @@ class WebViewContainer extends StatelessWidget {
   }
 
   void _handleUpdateVisitedHistory(
-      InAppWebViewController controller, Uri url, bool androidIsReload) {
+      InAppWebViewController controller, WebUri? url, bool? androidIsReload) {
     ref.read(webViewProvider.notifier).updateUrl(url.toString());
   }
 
