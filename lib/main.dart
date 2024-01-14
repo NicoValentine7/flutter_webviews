@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 Future main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -78,26 +77,55 @@ class App extends ConsumerWidget {
 class UrlInputField extends StatelessWidget {
   final WebViewState webViewState;
   final WidgetRef ref;
+  final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
 
-  UrlInputField({required this.webViewState, required this.ref});
+  UrlInputField({super.key, required this.webViewState, required this.ref}) {
+    _controller.text = webViewState.url;
+    _focusNode.addListener(_clearText);
+  }
+
+  void _clearText() {
+    if (_focusNode.hasFocus) {
+      _controller.clear();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       decoration: const InputDecoration(prefixIcon: Icon(Icons.search)),
-      controller: TextEditingController(text: webViewState.url),
+      controller: _controller,
+      focusNode: _focusNode,
       keyboardType: TextInputType.url,
-      onSubmitted: (value) {
-        var url = Uri.parse(value);
-        if (url.scheme.isEmpty) {
-          url = Uri.parse("https://www.google.com/search?q=$value");
-        }
-        ref.read(webViewProvider.notifier).updateUrl(url.toString());
-        ref.read(webViewProvider.notifier).webViewController?.loadUrl(
-              urlRequest: URLRequest(url: WebUri(url.toString())),
-            );
-      },
+      onSubmitted: _handleSubmitted,
     );
+  }
+
+  void _handleSubmitted(String value) {
+    var url = Uri.parse(value);
+    if (_isValidUrl(url)) {
+      _loadUrl(url.toString());
+    } else {
+      _searchGoogle(value);
+    }
+  }
+
+  bool _isValidUrl(Uri url) {
+    return url.scheme.isNotEmpty && url.host.isNotEmpty;
+  }
+
+  void _loadUrl(String url) {
+    ref.read(webViewProvider.notifier).updateUrl(url);
+    ref.read(webViewProvider.notifier).webViewController?.loadUrl(
+          urlRequest: URLRequest(url: WebUri(url)),
+        );
+  }
+
+  void _searchGoogle(String query) {
+    var searchUrl =
+        'https://www.google.com/search?q=${Uri.encodeComponent(query)}';
+    _loadUrl(searchUrl);
   }
 }
 
@@ -105,7 +133,8 @@ class WebViewContainer extends StatelessWidget {
   final WebViewState webViewState;
   final WidgetRef ref;
 
-  WebViewContainer({required this.webViewState, required this.ref});
+  const WebViewContainer(
+      {super.key, required this.webViewState, required this.ref});
 
   @override
   Widget build(BuildContext context) {
@@ -114,30 +143,40 @@ class WebViewContainer extends StatelessWidget {
         children: [
           InAppWebView(
             initialUrlRequest: URLRequest(url: WebUri(webViewState.url)),
-            onWebViewCreated: (controller) async {
-              ref
-                  .read(webViewProvider.notifier)
-                  .setWebViewController(controller);
-              var url = await controller.getUrl();
-              ref.read(webViewProvider.notifier).updateUrl(url.toString());
-            },
-            onLoadStart: (controller, url) async {
-              var url = await controller.getUrl();
-              ref.read(webViewProvider.notifier).updateUrl(url.toString());
-            },
-            onProgressChanged: (controller, progress) {
-              ref.read(webViewProvider.notifier).updateProgress(progress / 100);
-            },
-            onUpdateVisitedHistory: (controller, url, androidIsReload) {
-              ref.read(webViewProvider.notifier).updateUrl(url.toString());
-            },
+            onWebViewCreated: _handleWebViewCreated,
+            onLoadStart: _handleLoadStart,
+            onProgressChanged: _handleProgressChanged,
+            onUpdateVisitedHistory: _handleUpdateVisitedHistory,
           ),
-          webViewState.progress < 1.0
-              ? LinearProgressIndicator(value: webViewState.progress)
-              : Container(),
+          _buildProgressIndicator(),
         ],
       ),
     );
   }
-}
 
+  void _handleWebViewCreated(InAppWebViewController controller) async {
+    ref.read(webViewProvider.notifier).setWebViewController(controller);
+    var url = await controller.getUrl();
+    ref.read(webViewProvider.notifier).updateUrl(url.toString());
+  }
+
+  void _handleLoadStart(InAppWebViewController controller, Uri url) async {
+    var url = await controller.getUrl();
+    ref.read(webViewProvider.notifier).updateUrl(url.toString());
+  }
+
+  void _handleProgressChanged(InAppWebViewController controller, int progress) {
+    ref.read(webViewProvider.notifier).updateProgress(progress / 100);
+  }
+
+  void _handleUpdateVisitedHistory(
+      InAppWebViewController controller, Uri url, bool androidIsReload) {
+    ref.read(webViewProvider.notifier).updateUrl(url.toString());
+  }
+
+  Widget _buildProgressIndicator() {
+    return webViewState.progress < 1.0
+        ? LinearProgressIndicator(value: webViewState.progress)
+        : Container();
+  }
+}
