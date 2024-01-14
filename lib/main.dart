@@ -66,8 +66,8 @@ class App extends ConsumerWidget {
       body: SafeArea(
         child: Column(
           children: <Widget>[
-            UrlInputField(webViewState: webViewState, ref: ref),
             WebViewContainer(webViewState: webViewState, ref: ref),
+            UrlInputField(webViewState: webViewState, ref: ref),
           ],
         ),
       ),
@@ -164,24 +164,37 @@ class WebViewContainer extends StatelessWidget {
     );
   }
 
+  Widget _buildProgressIndicator() {
+    return Center(
+      child: SizedBox(
+        width: 100, // ここで幅を設定します
+        height: 100, // ここで高さを設定します
+        child: webViewState.progress < 1.0
+            ? const LoadingIndicator(
+                indicatorType: Indicator.ballTrianglePathColoredFilled,
+
+                /// Optional, The color collections
+                strokeWidth: 6,
+
+                /// Optional, lineを含むウィジェットにのみ適用されます。
+                // backgroundColor: Colors.black,
+
+                /// Optional, Background of the widget
+                pathBackgroundColor: Colors.black
+
+                /// Optional, strokeの背景色
+                )
+            : Container(),
+      ),
+    );
+  }
+
   void _goBack() async {
-    if (await ref
-            .read(webViewProvider.notifier)
-            .webViewController
-            ?.canGoBack() ??
-        false) {
-      ref.read(webViewProvider.notifier).webViewController?.goBack();
-    }
+    ref.read(webViewProvider.notifier).webViewController?.goBack();
   }
 
   void _goForward() async {
-    if (await ref
-            .read(webViewProvider.notifier)
-            .webViewController
-            ?.canGoForward() ??
-        false) {
-      ref.read(webViewProvider.notifier).webViewController?.goForward();
-    }
+    ref.read(webViewProvider.notifier).webViewController?.goForward();
   }
 
   void _handleWebViewCreated(InAppWebViewController controller) async {
@@ -202,30 +215,5 @@ class WebViewContainer extends StatelessWidget {
   void _handleUpdateVisitedHistory(
       InAppWebViewController controller, WebUri? url, bool? androidIsReload) {
     ref.read(webViewProvider.notifier).updateUrl(url.toString());
-  }
-
-  Widget _buildProgressIndicator() {
-    return Center(
-      child: SizedBox(
-        width: 200, // ここで幅を設定します
-        height: 200, // ここで高さを設定します
-        child: webViewState.progress < 1.0
-            ? const LoadingIndicator(
-                indicatorType: Indicator.pacman,
-
-                /// Optional, The color collections
-                strokeWidth: 6,
-
-                /// Optional, lineを含むウィジェットにのみ適用されます。
-                // backgroundColor: Colors.black,
-
-                /// Optional, Background of the widget
-                pathBackgroundColor: Colors.black
-
-                /// Optional, strokeの背景色
-                )
-            : Container(),
-      ),
-    );
   }
 }
