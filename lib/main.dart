@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:loading_indicator/loading_indicator.dart';
 
 Future main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -139,19 +140,48 @@ class WebViewContainer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Stack(
-        children: [
-          InAppWebView(
-            initialUrlRequest: URLRequest(url: WebUri(webViewState.url)),
-            onWebViewCreated: _handleWebViewCreated,
-            onLoadStart: _handleLoadStart,
-            onProgressChanged: _handleProgressChanged,
-            onUpdateVisitedHistory: _handleUpdateVisitedHistory,
-          ),
-          _buildProgressIndicator(),
-        ],
+      child: GestureDetector(
+        onHorizontalDragEnd: (DragEndDetails details) {
+          if (details.primaryVelocity! > 0) {
+            _goBack();
+          } else if (details.primaryVelocity! < 0) {
+            _goForward();
+          }
+        },
+        child: Stack(
+          children: [
+            InAppWebView(
+              initialUrlRequest: URLRequest(url: WebUri(webViewState.url)),
+              onWebViewCreated: _handleWebViewCreated,
+              onLoadStart: _handleLoadStart,
+              onProgressChanged: _handleProgressChanged,
+              onUpdateVisitedHistory: _handleUpdateVisitedHistory,
+            ),
+            _buildProgressIndicator(),
+          ],
+        ),
       ),
     );
+  }
+
+  void _goBack() async {
+    if (await ref
+            .read(webViewProvider.notifier)
+            .webViewController
+            ?.canGoBack() ??
+        false) {
+      ref.read(webViewProvider.notifier).webViewController?.goBack();
+    }
+  }
+
+  void _goForward() async {
+    if (await ref
+            .read(webViewProvider.notifier)
+            .webViewController
+            ?.canGoForward() ??
+        false) {
+      ref.read(webViewProvider.notifier).webViewController?.goForward();
+    }
   }
 
   void _handleWebViewCreated(InAppWebViewController controller) async {
@@ -175,8 +205,27 @@ class WebViewContainer extends StatelessWidget {
   }
 
   Widget _buildProgressIndicator() {
-    return webViewState.progress < 1.0
-        ? LinearProgressIndicator(value: webViewState.progress)
-        : Container();
+    return Center(
+      child: SizedBox(
+        width: 200, // ここで幅を設定します
+        height: 200, // ここで高さを設定します
+        child: webViewState.progress < 1.0
+            ? const LoadingIndicator(
+                indicatorType: Indicator.pacman,
+
+                /// Optional, The color collections
+                strokeWidth: 6,
+
+                /// Optional, lineを含むウィジェットにのみ適用されます。
+                // backgroundColor: Colors.black,
+
+                /// Optional, Background of the widget
+                pathBackgroundColor: Colors.black
+
+                /// Optional, strokeの背景色
+                )
+            : Container(),
+      ),
+    );
   }
 }

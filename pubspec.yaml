@@ -40,6 +40,7 @@ dependencies:
   flutter_riverpod: ^2.4.9
   logger: ^2.0.2+1
   pedantic_mono: ^1.24.0+1
+  loading_indicator: ^3.1.1
 
 dev_dependencies:
   flutter_test:
